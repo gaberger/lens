@@ -247,7 +247,8 @@ for L, entry in enumerate(out["layers"]):
             entry["hid"][pos]    = out["layers"][BASE]["hid"][pos]
             inherited += 1
 print(f"transparent keys resolved to the base layer: {inherited}")
-dest = os.path.expanduser("~/Dygma/lens/layers.json")
+# Beside the app, wherever the checkout is, not a path baked into the script.
+dest = os.path.join(os.path.dirname(S), "layers.json")
 json.dump(out, open(dest, "w"), ensure_ascii=False)
 print("geom keys:", len(GEOM), "bounds:", BOUNDS)
 print("wrote", dest, "-", sum(1 for l in out["layers"] if any(l["labels"])), "layers with content")

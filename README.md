@@ -61,10 +61,14 @@ Requires macOS 13 or later, Apple silicon, a Dygma Defy, and Bazecor with at lea
 saved backup.
 
 ```sh
-git clone https://github.com/gaberger/lens.git ~/Dygma/lens
-cd ~/Dygma/lens
+git clone https://github.com/gaberger/lens.git
+cd lens
 ./refresh.sh
 ```
+
+Clone it anywhere. Lens keeps `layers.json`, `config.json`, the log and the lock in
+the folder holding `Lens.app`, so the checkout is self-contained. `--home <dir>` or
+`LENS_HOME` moves that folder if you want the app somewhere else.
 
 `refresh.sh` decodes your newest Bazecor backup and starts the overlay. macOS will ask
 for **Input Monitoring** the first time. Say yes — that permission is what lets Lens
@@ -99,7 +103,7 @@ the live layer off the serial port.
 After any change you save in Bazecor:
 
 ```sh
-~/Dygma/lens/refresh.sh
+./refresh.sh
 ```
 
 ---
@@ -124,7 +128,8 @@ Pass after `--args`, or leave them in `refresh.sh`. They persist in `config.json
 | `--upright-labels` | do not turn the thumb legends with the caps |
 | `--replace` | take over from the copy already running (one instance only) |
 | `--port <dev>` | serial device, default `/dev/cu.usbmodem1101` |
-| `--map <file>` | keymap to draw, default `~/Dygma/lens/layers.json` |
+| `--map <file>` | keymap to draw, default `layers.json` beside `Lens.app` |
+| `--home <dir>` | folder holding `layers.json`, `config.json` and the log |
 | `--check` | print the Input Monitoring state and exit |
 
 The menu-bar icon holds the rest: **Refresh keymap** (⌘R) after a change in Bazecor,

@@ -19,6 +19,34 @@ import Cocoa
 import Darwin
 import IOKit.hid
 
+// ── Where Lens keeps its files ────────────────────────────────────────────────
+/// layers.json, config.json, the log, the lock and the drill scores all live in
+/// one folder. It is the folder holding Lens.app, so a clone works wherever the
+/// user put it — not a path baked into the binary.
+enum Paths {
+    static let home: String = {
+        let fm = FileManager.default
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--home"), i + 1 < args.count {
+            return (args[i + 1] as NSString).expandingTildeInPath
+        }
+        if let e = ProcessInfo.processInfo.environment["LENS_HOME"], !e.isEmpty {
+            return (e as NSString).expandingTildeInPath
+        }
+        // Bundle.main.bundlePath is Lens.app itself, or the folder holding the
+        // bare binary when it is run without a bundle. Either way its parent is
+        // the checkout.
+        let beside = (Bundle.main.bundlePath as NSString).deletingLastPathComponent
+        if fm.fileExists(atPath: beside + "/layers.json") { return beside }
+        // Anyone who installed before this was configurable keeps their folder.
+        let legacy = NSHomeDirectory() + "/Dygma/lens"
+        if fm.fileExists(atPath: legacy + "/layers.json") { return legacy }
+        return beside
+    }()
+
+    static func of(_ name: String) -> String { home + "/" + name }
+}
+
 // ── Keymap data ───────────────────────────────────────────────────────────────
 struct Layer { var labels: [String] = []; var shift: [String] = []; var hid: [Int] = [] }
 
@@ -287,7 +315,7 @@ final class Drill {
     var includeBase = false
     var countMisses = true
     private(set) var scores: [String: Score] = [:]
-    private let path = NSHomeDirectory() + "/Dygma/lens/drill.json"
+    private let path = Paths.of("drill.json")
 
     init() {
         if let d = FileManager.default.contents(atPath: path),
@@ -888,7 +916,7 @@ final class Controller: NSObject {
 
     /// Persist one setting so it survives the next relaunch.
     private func save(_ key: String, _ value: Any) {
-        let path = NSHomeDirectory() + "/Dygma/lens/config.json"
+        let path = Paths.of("config.json")
         var cfg = (try? JSONSerialization.jsonObject(
             with: Data(contentsOf: URL(fileURLWithPath: path)))) as? [String: Any] ?? [:]
         cfg[key] = value
@@ -899,7 +927,7 @@ final class Controller: NSObject {
     }
 
     @objc private func doRefresh(_ sender: NSMenuItem) {
-        let dir = NSHomeDirectory() + "/Dygma/lens/decode"
+        let dir = Paths.of("decode")
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         p.arguments = ["python3", dir + "/export_layers.py"]
@@ -990,7 +1018,7 @@ final class Controller: NSObject {
         rows.sort { $0.0 > $1.0 }
         let text = "Lens drill — slowest first\n\n"
                  + rows.map { $0.1 }.joined(separator: "\n") + "\n"
-        let out = NSHomeDirectory() + "/Dygma/lens/drill-report.txt"
+        let out = Paths.of("drill-report.txt")
         try? text.write(toFile: out, atomically: true, encoding: .utf8)
         NSWorkspace.shared.open(URL(fileURLWithPath: out))
     }
@@ -1024,8 +1052,8 @@ final class Controller: NSObject {
         save("grab", alwaysGrab); view.needsDisplay = true
     }
     @objc private func reveal() {
-        NSWorkspace.shared.selectFile(NSHomeDirectory() + "/Dygma/lens/config.json",
-                                      inFileViewerRootedAtPath: NSHomeDirectory() + "/Dygma/lens")
+        NSWorkspace.shared.selectFile(Paths.of("config.json"),
+                                      inFileViewerRootedAtPath: Paths.home)
     }
 
     private func watchBazecor() {
@@ -1164,22 +1192,24 @@ if args.contains("--help") {
       --toggle <k>  key that shows/hides the overlay: f13..f24 or none
                     (default f13 — assign F13 to a key in Bazecor)
       --port <dev>  default /dev/cu.usbmodem1101
-      --map <file>  default ~/Dygma/lens/layers.json
+      --map <file>  default: layers.json beside Lens.app
+      --home <dir>  folder holding layers.json, config.json and the log
+                    (default: the folder Lens.app is in; LENS_HOME also works)
 
-    Settings persist in ~/Dygma/lens/config.json; flags override it.
+    Settings persist in config.json in that folder; flags override it.
     """)
     exit(0)
 }
 let home = FileManager.default.homeDirectoryForCurrentUser.path
 
 // Launched from Finder or `open`, stdout goes nowhere. Keep a log we can read.
-freopen(home + "/Dygma/lens/lens.log", "a", stdout)
-freopen(home + "/Dygma/lens/lens.log", "a", stderr)
+freopen(Paths.of("lens.log"), "a", stdout)
+freopen(Paths.of("lens.log"), "a", stderr)
 setvbuf(stdout, nil, _IOLBF, 0)
 print("\n=== lens started \(Date()) ===")
 
 // One instance only.
-let lockPath = home + "/Dygma/lens/.lock"
+let lockPath = Paths.of(".lock")
 let lockFD = Darwin.open(lockPath, O_CREAT | O_RDWR, 0o644)
 func err(_ m: String) { FileHandle.standardError.write(Data((m + "\n").utf8)) }
 if flock(lockFD, LOCK_EX | LOCK_NB) != 0 {
@@ -1211,7 +1241,7 @@ func parseToggle(_ v: String) -> Int? {
 // Settings live in a file, because a relaunch (Finder, or macOS restarting the
 // app after a permission change) throws command-line arguments away.
 var cfg: [String: Any] = [:]
-if let d = FileManager.default.contents(atPath: home + "/Dygma/lens/config.json"),
+if let d = FileManager.default.contents(atPath: Paths.of("config.json")),
    let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { cfg = j }
 
 func flag(_ name: String, _ key: String, _ def: Bool) -> Bool {
@@ -1240,8 +1270,8 @@ func findPort() -> String {
 }
 
 let c = Controller(port: findPort(),
-                   mapPath: setting("map", "map", home + "/Dygma/lens/layers.json"),
-                   posPath: home + "/Dygma/lens/position.json",
+                   mapPath: setting("map", "map", Paths.of("layers.json")),
+                   posPath: Paths.of("position.json"),
                    width: CGFloat(Double(setting("width", "width", "760")) ?? 760),
                    forcedLayer: Int(opt("--layer", "")).map { $0 - 1 },
                    toggleUsage: parseToggle(setting("toggle", "toggle", "f13")),
