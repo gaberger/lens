@@ -1,0 +1,19 @@
+# Runtime state the app writes while it runs. Personal, and changes every launch.
+.lock
+lens.log
+position.json
+config.json
+drill.json
+drill-report.txt
+
+# Build output. Lens.app carries the binary that ships.
+build/
+lens
+makeicon
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
