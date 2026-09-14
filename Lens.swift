@@ -355,6 +355,15 @@ final class LensView: NSView {
     var keymap = Keymap()
     var layerIndex = 0
     var status: String? = nil
+    private var statusShort: String? = nil
+
+    /// Set the corner message. `short` is what the 276-point strip shows when
+    /// the full wording will not fit; it falls back to the full wording.
+    func note(_ long: String?, short: String? = nil) {
+        status = long
+        statusShort = long == nil ? nil : (short ?? long)
+        needsDisplay = true
+    }
     var hint: String? = nil
     var pressed = Set<Int>()
     var shifted = false      // Shift is held: draw the shifted legends
@@ -405,7 +414,7 @@ final class LensView: NSView {
         // The strip is 276 points wide and the layer name owns the left of it.
         // A status therefore takes the room of both the last key and the
         // batteries, and truncates with an ellipsis rather than losing a letter.
-        if let st = status {
+        if let st = statusShort ?? status {
             draw(st, in: NSRect(x: 126, y: bounds.midY - 8,
                                 width: bounds.width - 142, height: 16),
                  size: 9.5, weight: .medium, color: NSColor.systemOrange,
@@ -901,10 +910,10 @@ final class Controller: NSObject {
         let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         print("refresh (exit \(p.terminationStatus)):\n" + out.trimmingCharacters(in: .newlines))
         guard p.terminationStatus == 0 else {
-            view.status = "keymap refresh failed — see lens.log"; view.needsDisplay = true; return
+            view.note("keymap refresh failed — see lens.log", short: "refresh failed"); return
         }
         view.keymap = Keymap.load(mapPath)
-        view.status = nil
+        view.note(nil)
         resize(to: view.idealSize)
     }
 
@@ -997,7 +1006,7 @@ final class Controller: NSObject {
         glass.toggle(); s.state = glass ? .on : .off
         view.glass = glass
         save("glass", glass)
-        view.status = "restart Lens to change the background"
+        view.note("restart Lens to change the background", short: "restart to apply")
         view.needsDisplay = true
     }
     @objc private func toggleColors(_ s: NSMenuItem) {
@@ -1026,7 +1035,7 @@ final class Controller: NSObject {
                 .runningApplications(withBundleIdentifier: "com.dygmalab.bazecor").isEmpty
             if up != self.bazecorUp {
                 self.bazecorUp = up
-                self.view.status = up ? "Bazecor has the keyboard" : nil
+                self.view.note(up ? "Bazecor has the keyboard" : nil)
                 self.view.needsDisplay = true
             }
         }
@@ -1090,7 +1099,7 @@ final class Controller: NSObject {
                     print("serial: cannot open \(self.focus.port) — retrying")
                 }
                 DispatchQueue.main.async {
-                    self.view.status = "no Neuron on \(self.focus.port)"
+                    self.view.note("no Neuron on \(self.focus.port)", short: "no Neuron")
                     self.view.needsDisplay = true
                 }
                 self.q.asyncAfter(deadline: .now() + 1.5) { self.poll() }
@@ -1105,12 +1114,12 @@ final class Controller: NSObject {
             DispatchQueue.main.async {
                 if let n, n != self.lastLayer, !self.pinned {
                     self.lastLayer = n
-                    self.view.status = nil
+                    self.view.note(nil)
                     self.view.layerIndex = n
                     self.view.needsDisplay = true
                     self.show(fade: true)
                 } else if n != nil, self.view.status != nil {
-                    self.view.status = nil; self.view.needsDisplay = true
+                    self.view.note(nil)
                 }
             }
             self.poll()
