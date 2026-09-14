@@ -135,9 +135,19 @@ following, check whether Bazecor is open.
 
 ## Credit and licence
 
-The files in `decode/db/` are lifted from
+Lens is **GPL-3.0-or-later**. The full text is in [LICENSE](LICENSE).
+
+    Lens — layer overlay for the Dygma Defy
+    Copyright (C) 2026 Gary Berger
+
+    This program is free software: you can redistribute it and/or modify it under
+    the terms of the GNU General Public License as published by the Free Software
+    Foundation, either version 3 of the License, or (at your option) any later
+    version. It comes with ABSOLUTELY NO WARRANTY.
+
+It has to be. The files in `decode/db/` are lifted from
 [Bazecor](https://github.com/Dygmalab/Bazecor) by Keyboardio and DygmaLab SE, as is the
-thumb-cap geometry. Those files are **GPL-3.0**, and this project carries that licence
-with them.
+thumb-cap geometry in `decode/defy-thumb-paths.ts`. Those files are GPL-3.0, and a
+GPL-3.0 part makes a GPL-3.0 whole.
 
 The keymap in `layers.json` is mine. Run `refresh.sh` and it becomes yours.
