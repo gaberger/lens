@@ -456,8 +456,14 @@ final class LensView: NSView {
         draw(name, in: NSRect(x: pad, y: pad - 2, width: bounds.width - pad*2, height: 20),
              size: 15, weight: .semibold, color: .white, align: .center)
 
-        // drill prompt replaces the battery while it runs
-        if let d = drill, d.active {
+        // One corner, one message, or they draw over each other. A status is rare
+        // and it matters, so it wins; then the drill while it runs; then the
+        // batteries, which are only ever a glance.
+        if let st = status {
+            draw(st, in: NSRect(x: bounds.width - pad - 260, y: pad + 2,
+                                width: 260, height: 16),
+                 size: 10.5, weight: .medium, color: NSColor.systemOrange, align: .right)
+        } else if let d = drill, d.active {
             let total = d.hits + d.misses
             let acc = total == 0 ? 100 : Int(Double(d.hits) / Double(total) * 100)
             draw("\(d.hits) hit · \(acc)% · \(d.lastResult)",
@@ -471,10 +477,6 @@ final class LensView: NSView {
                  size: 10.5, weight: .medium,
                  color: NSColor(calibratedWhite: 1, alpha: min(l, r) < 20 ? 0.95 : 0.45),
                  align: .right)
-        }
-        if let st = status {
-            draw(st, in: NSRect(x: pad, y: pad, width: bounds.width - pad*2, height: 16),
-                 size: 10.5, weight: .medium, color: NSColor.systemOrange, align: .right)
         }
         if let h = hint {
             draw(h, in: NSRect(x: pad, y: bounds.height - pad - 12,
