@@ -402,6 +402,16 @@ final class LensView: NSView {
         draw(name, in: NSRect(x: 36, y: bounds.midY - 11, width: 90, height: 22),
              size: 16, weight: .semibold, color: .white, align: .left)
 
+        // The strip is 276 points wide and the layer name owns the left of it.
+        // A status therefore takes the room of both the last key and the
+        // batteries, and truncates with an ellipsis rather than losing a letter.
+        if let st = status {
+            draw(st, in: NSRect(x: 126, y: bounds.midY - 8,
+                                width: bounds.width - 142, height: 16),
+                 size: 9.5, weight: .medium, color: NSColor.systemOrange,
+                 align: .right, lineBreak: .byTruncatingTail)
+            return
+        }
         if !lastKey.isEmpty {
             draw(lastKey, in: NSRect(x: 126, y: bounds.midY - 9, width: 76, height: 18),
                  size: 12.5, weight: .medium,
@@ -568,8 +578,9 @@ final class LensView: NSView {
     override func mouseUp(with e: NSEvent) { grip = nil; onMoved?() }
 
     private func draw(_ s: String, in r: NSRect, size: CGFloat, weight: NSFont.Weight,
-                      color: NSColor, align: NSTextAlignment) {
-        let ps = NSMutableParagraphStyle(); ps.alignment = align; ps.lineBreakMode = .byClipping
+                      color: NSColor, align: NSTextAlignment,
+                      lineBreak: NSLineBreakMode = .byClipping) {
+        let ps = NSMutableParagraphStyle(); ps.alignment = align; ps.lineBreakMode = lineBreak
         (s as NSString).draw(in: r, withAttributes: [
             .font: NSFont.systemFont(ofSize: size, weight: weight),
             .foregroundColor: color, .paragraphStyle: ps])
