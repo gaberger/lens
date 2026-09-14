@@ -37,9 +37,20 @@ keystroke. Your typing is untouched.
 **Swaps legends when you hold Shift.** The number row turns into `!@#$%^&*()`, and
 `' , . / [ ] \` turn into `" < > ? { } |`.
 
-**Drills you.** Turn on *Layer drill* in the menu and it picks a key, waits, and times
-you. *Drill report* writes out your slowest and most-missed keys, worst first. It is
-an unkind little feature and it works.
+**Calls your layers by name.** Not "Layer 3" — whatever you named it in Bazecor. It
+reads the names out of Bazecor's own config.
+
+**Watches both batteries.** On a wireless Defy the corner shows `L 84%  R 79%`, read
+live off the Neuron, and brightens when either half drops under 20%.
+
+**Shrinks to a strip.** *Layer strip only* drops the board and leaves a small pill with
+the layer name and the last key you pressed. Each size — strip, small, full — remembers
+its own spot on screen.
+
+**Drills you.** Turn on *Layer drill* and it picks a key, waits, and times you. Scores
+persist in `drill.json` across sessions, and *Drill report* writes your slowest and
+most-missed keys to `drill-report.txt`, worst first, then opens it. It is an unkind
+little feature and it works.
 
 ---
 
@@ -108,11 +119,17 @@ Pass after `--args`, or leave them in `refresh.sh`. They persist in `config.json
 | `--no-colors` | plain keys instead of your LED colours |
 | `--fade` | hide 1.6 s after a change |
 | `--grab` | always draggable, gives up click-through |
-| `--replace` | take over from a copy already running |
+| `--drag-mods cmd,shift` | hold these to grab it instead of `--grab` |
+| `--upright-labels` | do not turn the thumb legends with the caps |
+| `--replace` | take over from the copy already running (one instance only) |
+| `--port <dev>` | serial device, default `/dev/cu.usbmodem1101` |
+| `--map <file>` | keymap to draw, default `~/Dygma/lens/layers.json` |
 | `--check` | print the Input Monitoring state and exit |
 
-The menu-bar icon holds the same switches, plus size, opacity, frosted background, and
-the drill.
+The menu-bar icon holds the rest: **Refresh keymap** (⌘R) after a change in Bazecor,
+size and opacity sliders, frosted background, LED colours, the layer strip, turning the
+thumb legends with the caps, always-draggable, **Layer drill** (⌘D) with its two
+switches, **Drill report**, and **Reveal folder**.
 
 ---
 
