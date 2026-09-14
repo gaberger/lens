@@ -134,7 +134,9 @@ final class KeyTap {
     private(set) var flags: CGEventFlags = []
     var onChange: (() -> Void)?
     var onToggle: (() -> Void)?
+    var onShot: (() -> Void)?
     var toggleUsage: Int? = nil
+    var shotUsage: Int? = nil
     var debugKeys = false
 
     var isRunning: Bool { tap != nil }
@@ -175,6 +177,10 @@ final class KeyTap {
         guard usage != 0 else { return }
         if let t = toggleUsage, usage == t {          // the summon key, never a normal press
             if type == .keyDown { DispatchQueue.main.async { self.onToggle?() } }
+            return
+        }
+        if let sk = shotUsage, usage == sk {          // the screenshot key, likewise
+            if type == .keyDown { DispatchQueue.main.async { self.onShot?() } }
             return
         }
         let before = down
@@ -629,6 +635,7 @@ final class Controller: NSObject {
     private var tick = 0
     /// Each size remembers its own spot.
     private var posKey: String { pill ? "pill" : (view.targetWidth < 520 ? "small" : "big") }
+    private var shotUsage: Int? = nil
     var pill: Bool
     /// Bazecor opens the Neuron exclusively. While it is up, we must not hold the port.
     private var bazecorUp = false
@@ -636,7 +643,7 @@ final class Controller: NSObject {
     private let q = DispatchQueue(label: "lens.serial")
 
     init(port: String, mapPath: String, posPath: String, width: CGFloat,
-         forcedLayer: Int?, toggleUsage: Int?, useSerial: Bool,
+         forcedLayer: Int?, toggleUsage: Int?, shotUsage: Int?, useSerial: Bool,
          showColors: Bool, rotateLabels: Bool, glass: Bool, opacity: CGFloat,
          pill: Bool, drillBase: Bool, drillMisses: Bool,
          alwaysOn: Bool, placing: Bool, grab: Bool,
@@ -647,6 +654,7 @@ final class Controller: NSObject {
         self.placing = placing
         self.posPath = posPath
         self.toggleUsage = toggleUsage
+        self.shotUsage = shotUsage
         self.useSerial = useSerial
         self.mapPath = mapPath
         self.glass = glass
@@ -709,11 +717,20 @@ final class Controller: NSObject {
         buildMenu()
         watchBazecor()
         if useSerial { poll() }
+        // --shot writes the picture and quits. Useful for a README, and it works
+        // with no Input Monitoring grant, because it never asks about a key.
+        if CommandLine.arguments.contains("--shot") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+                self?.saveShot(); exit(0)
+            }
+        }
     }
 
     private func startTap() {
         view.onMoved = { [weak self] in self?.moved() }
         tap.toggleUsage = toggleUsage
+        tap.shotUsage = shotUsage
+        tap.onShot = { [weak self] in self?.saveShot() }
         tap.debugKeys = CommandLine.arguments.contains("--debug-keys")
         tap.onToggle = { [weak self] in
             guard let self else { return }
@@ -831,6 +848,7 @@ final class Controller: NSObject {
         m.addItem(sliderItem("Opacity", 0.25, 1.0, Double(opacity),
                              #selector(setOpacity(_:))))
         m.addItem(.separator())
+        m.addItem(item("Save a picture of the overlay", #selector(shotFromMenu)))
         m.addItem(item("Reveal folder", #selector(reveal)))
         m.addItem(NSMenuItem(title: "Quit Lens",
                              action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -1001,6 +1019,66 @@ final class Controller: NSObject {
         view.grabbable = alwaysGrab
         save("grab", alwaysGrab); view.needsDisplay = true
     }
+    @objc private func shotFromMenu() { saveShot() }
+
+    /// Write a picture of the overlay to docs/lens.png.
+    ///
+    /// The view is asked to draw itself into a bitmap. Nothing reads the screen,
+    /// so this needs no Screen Recording grant and catches no other window.
+    /// The frosted background is a blur of what lies behind the panel and cannot
+    /// be drawn offscreen, so the picture gets an opaque base of its own.
+    private func saveShot() {
+        let dir = NSHomeDirectory() + "/Dygma/lens/docs"
+        try? FileManager.default.createDirectory(atPath: dir,
+                                                 withIntermediateDirectories: true)
+        let dest = dir + "/lens.png"
+        let r = view.bounds
+        // Always render at 2x. The overlay may be sitting on a 1x display, and a
+        // soft picture is no use in a README.
+        let px = 2
+        guard r.width > 1, r.height > 1,
+              let front = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: Int(r.width) * px, pixelsHigh: Int(r.height) * px,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        else { return }
+        front.size = r.size
+        // Draw the panel as it looks without frosting, and without the transient
+        // notices. A picture is kept; a notice is not worth keeping.
+        let wasGlass = view.glass, wasHint = view.hint, wasStatus = view.status
+        view.glass = false; view.hint = nil; view.status = nil
+        view.cacheDisplay(in: r, to: front)
+        view.glass = wasGlass; view.hint = wasHint; view.status = wasStatus
+        guard let out = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: front.pixelsWide, pixelsHigh: front.pixelsHigh,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return }
+        out.size = r.size          // points, not pixels, so a retina shot stays sharp
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: out)
+        let radius: CGFloat = pill ? r.height/2 : 16
+        NSBezierPath(roundedRect: NSRect(origin: .zero, size: r.size),
+                     xRadius: radius, yRadius: radius).addClip()
+        NSColor(calibratedWhite: 0.07, alpha: 1).setFill()
+        NSRect(origin: .zero, size: r.size).fill()
+        front.draw(in: NSRect(origin: .zero, size: r.size))
+        NSGraphicsContext.restoreGraphicsState()
+        guard let png = out.representation(using: .png, properties: [:]),
+              (try? png.write(to: URL(fileURLWithPath: dest))) != nil else {
+            view.status = "could not write docs/lens.png"; view.needsDisplay = true; return
+        }
+        print("shot: \(dest) \(out.pixelsWide)x\(out.pixelsHigh)")
+        view.status = "saved docs/lens.png"
+        view.needsDisplay = true
+        // The message is a receipt, not a permanent part of the overlay.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self, self.view.status == "saved docs/lens.png" else { return }
+            self.view.status = nil; self.view.needsDisplay = true
+        }
+    }
+
     @objc private func reveal() {
         NSWorkspace.shared.selectFile(NSHomeDirectory() + "/Dygma/lens/config.json",
                                       inFileViewerRootedAtPath: NSHomeDirectory() + "/Dygma/lens")
@@ -1141,6 +1219,9 @@ if args.contains("--help") {
       --layer <n>   pin a layer instead of reading the keyboard
       --toggle <k>  key that shows/hides the overlay: f13..f24 or none
                     (default f13 — assign F13 to a key in Bazecor)
+      --shot-key <k>  key that writes docs/lens.png: f13..f24 or none
+                    (default f14 — assign F14 to a key in Bazecor)
+      --shot        write docs/lens.png and quit
       --port <dev>  default /dev/cu.usbmodem1101
       --map <file>  default ~/Dygma/lens/layers.json
 
@@ -1223,6 +1304,7 @@ let c = Controller(port: findPort(),
                    width: CGFloat(Double(setting("width", "width", "760")) ?? 760),
                    forcedLayer: Int(opt("--layer", "")).map { $0 - 1 },
                    toggleUsage: parseToggle(setting("toggle", "toggle", "f13")),
+                   shotUsage: parseToggle(setting("shot-key", "shotKey", "f14")),
                    useSerial: flag("serial", "serial", true),
                    showColors: flag("colors", "colors", true),
                    rotateLabels: flag("rotate-labels", "rotateLabels", true),

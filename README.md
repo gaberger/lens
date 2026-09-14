@@ -6,9 +6,9 @@ Ten layers. Sixty-odd keys each. You remapped all of it six months ago and you w
 sure you would remember. Lens puts the answer on screen in the shape of the board
 under your hands, and takes it away again when you press F13.
 
-<!-- Drop a screenshot at docs/lens.png and uncomment:
 ![Lens overlay](docs/lens.png)
--->
+
+*Lens drew that picture of itself. See [Taking its own picture](#taking-its-own-picture).*
 
 It is one Swift file, no dependencies, no Xcode project, no framework. Double-click
 `Lens.app`. That is the whole thing.
@@ -46,6 +46,12 @@ live off the Neuron, and brightens when either half drops under 20%.
 **Shrinks to a strip.** *Layer strip only* drops the board and leaves a small pill with
 the layer name and the last key you pressed. Each size — strip, small, full — remembers
 its own spot on screen.
+
+**Takes its own picture.** Press the screenshot key — F14 by default, so bind F14 to a
+key on the Defy — and the overlay writes `docs/lens.png`. It draws itself into the
+file rather than photographing the screen, so macOS never asks for Screen Recording,
+nothing else on screen creeps into the shot, and the result is 2x sharp even on a 1x
+display. The picture at the top of this page was made that way.
 
 **Drills you.** Turn on *Layer drill* and it picks a key, waits, and times you. Scores
 persist in `drill.json` across sessions, and *Drill report* writes your slowest and
@@ -124,12 +130,33 @@ Pass after `--args`, or leave them in `refresh.sh`. They persist in `config.json
 | `--replace` | take over from the copy already running (one instance only) |
 | `--port <dev>` | serial device, default `/dev/cu.usbmodem1101` |
 | `--map <file>` | keymap to draw, default `~/Dygma/lens/layers.json` |
+| `--shot-key f14` | key that writes `docs/lens.png`; `f13`..`f24`, or `none` |
+| `--shot` | write `docs/lens.png` and quit |
 | `--check` | print the Input Monitoring state and exit |
 
 The menu-bar icon holds the rest: **Refresh keymap** (⌘R) after a change in Bazecor,
 size and opacity sliders, frosted background, LED colours, the layer strip, turning the
 thumb legends with the caps, always-draggable, **Layer drill** (⌘D) with its two
 switches, **Drill report**, and **Reveal folder**.
+
+---
+
+## Taking its own picture
+
+Bind **F14** to a key in Bazecor. Press it, and the overlay writes `docs/lens.png` and
+flashes *saved docs/lens.png* for a moment. Change the key with `--shot-key`, or turn
+it off with `--shot-key none`.
+
+From a script, with no key and no running copy:
+
+```sh
+~/Dygma/lens/Lens.app/Contents/MacOS/Lens --shot
+```
+
+The picture is never a capture of your screen. The overlay draws itself into a bitmap,
+which is why it needs no Screen Recording permission, cannot catch a stray window, and
+comes out at twice the resolution of the panel. It also drops the frosted background
+and any transient notice, so what lands in the file is the board and nothing else.
 
 ---
 
