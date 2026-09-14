@@ -8,6 +8,9 @@ under your hands, and takes it away again when you press F13.
 
 ![Lens overlay](docs/lens.png)
 
+*The overlay on layer 1, frosted, over a desktop. That orange note in the corner is
+Lens telling you it has given the serial port back to Bazecor.*
+
 It is one Swift file, no dependencies, no Xcode project, no framework. Double-click
 `Lens.app`. That is the whole thing.
 
