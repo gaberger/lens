@@ -741,7 +741,8 @@ final class Controller: NSObject {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.ignoresMouseEvents = !placing && !alwaysGrabInit
+        // A panel at alpha 0 still hit-tests, so it only takes clicks while it is visible.
+        panel.ignoresMouseEvents = !placing && !(alwaysGrabInit && self.alwaysOn)
         panel.isMovableByWindowBackground = placing
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary,
@@ -771,9 +772,7 @@ final class Controller: NSObject {
             self.stashed.toggle()
             if self.stashed {
                 self.hideWork?.cancel()
-                NSAnimationContext.runAnimationGroup { c in
-                    c.duration = 0.15; self.panel.animator().alphaValue = 0
-                }
+                self.fadeOut(duration: 0.15)
             } else {
                 self.show(fade: !self.alwaysOn)
             }
@@ -802,7 +801,6 @@ final class Controller: NSObject {
             let grab = self.alwaysGrab || self.dragMods.isSubset(of: self.tap.flags.grabBits)
             if grab != self.view.grabbable {
                 self.view.grabbable = grab
-                self.panel.ignoresMouseEvents = !grab
                 if grab { self.show(fade: false) } else { self.show(fade: true) }
             }
             self.view.needsDisplay = true
@@ -1047,8 +1045,8 @@ final class Controller: NSObject {
     }
     @objc private func toggleGrab(_ s: NSMenuItem) {
         alwaysGrab.toggle(); s.state = alwaysGrab ? .on : .off
-        panel.ignoresMouseEvents = !alwaysGrab
         view.grabbable = alwaysGrab
+        panel.ignoresMouseEvents = stashed || !takesClicks
         save("grab", alwaysGrab); view.needsDisplay = true
     }
     @objc private func reveal() {
@@ -1099,16 +1097,26 @@ final class Controller: NSObject {
         }
     }
 
+    /// Whether the overlay should catch the mouse while it is on screen.
+    private var takesClicks: Bool { placing || alwaysGrab || view.grabbable }
+
+    /// Every hide goes through here. A window at alpha 0 still hit-tests, so an
+    /// overlay that fades without also ignoring the mouse becomes an invisible
+    /// pane that swallows clicks on whatever is under it.
+    private func fadeOut(duration: Double) {
+        panel.ignoresMouseEvents = true
+        NSAnimationContext.runAnimationGroup { c in
+            c.duration = duration; panel.animator().alphaValue = 0
+        }
+    }
+
     private func show(fade: Bool) {
         hideWork?.cancel()
-        if stashed { panel.alphaValue = 0; return }
+        if stashed { panel.ignoresMouseEvents = true; panel.alphaValue = 0; return }
         panel.alphaValue = opacity
+        panel.ignoresMouseEvents = !takesClicks
         guard fade, !alwaysOn else { return }
-        let w = DispatchWorkItem { [weak self] in
-            NSAnimationContext.runAnimationGroup { c in
-                c.duration = 0.45; self?.panel.animator().alphaValue = 0
-            }
-        }
+        let w = DispatchWorkItem { [weak self] in self?.fadeOut(duration: 0.45) }
         hideWork = w
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: w)
     }
